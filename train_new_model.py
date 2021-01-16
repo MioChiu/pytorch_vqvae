@@ -8,7 +8,7 @@ from torchvision.utils import save_image, make_grid
 from tqdm import tqdm
 from options import Options
 from modules import VectorQuantizedVAE, to_scalar
-from datasets import MiniImagenet
+from datasets import MiniImagenet, DAGM2007
 from data import load_data
 from tensorboardX import SummaryWriter
 from models.vq_vae import VQVAE
@@ -16,7 +16,7 @@ from models.vq_vae import VQVAE
 
 def train(data_loader, model, optimizer, args, writer, epoch):
     pbar = tqdm(data_loader)
-    for images, _ in pbar:
+    for images in pbar:
         images = images.to(args.device)
 
         optimizer.zero_grad()
@@ -45,7 +45,7 @@ def train(data_loader, model, optimizer, args, writer, epoch):
 def test(data_loader, model, args, writer):
     with torch.no_grad():
         loss_recons, loss_vq = 0., 0.
-        for images, _ in data_loader:
+        for images in data_loader:
             images = images.to(args.device)
             x_tilde, loss_vq_ = model(images)
             loss_vq_ = torch.mean(loss_vq_)
@@ -81,13 +81,39 @@ def main(args):
     writer = SummaryWriter(args.log_dir)
     save_filename = args.save_dir
 
-    dataloader = load_data(args)
-    train_loader = dataloader['train']
-    valid_loader = dataloader['valid']
-    test_loader = dataloader['test']
+    # dataloader = load_data(args)
+    # train_loader = dataloader['train']
+    # valid_loader = dataloader['valid']
+    # test_loader = dataloader['test']
+
+    if args.dataset == 'DAGM2007':
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        # Define the train, valid & test datasets
+        train_dataset = DAGM2007(args.dataroot, 'train', transform=transform)
+        valid_dataset = DAGM2007(args.dataroot, 'test', transform=transform)
+        test_dataset = DAGM2007(args.dataroot, 'test', transform=transform)
+
+    # Define the data loaders
+    train_loader = torch.utils.data.DataLoader(train_dataset,
+                                               batch_size=args.batch_size,
+                                               shuffle=False,
+                                               num_workers=args.num_workers,
+                                               pin_memory=True)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset,
+                                               batch_size=16,
+                                               shuffle=False,
+                                               drop_last=True,
+                                               num_workers=args.num_workers,
+                                               pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset,
+                                              batch_size=16,
+                                              shuffle=True)
 
     # Fixed images for Tensorboard
-    fixed_images, _ = next(iter(valid_loader))
+    fixed_images = next(iter(valid_loader))
     fixed_grid = make_grid(fixed_images, nrow=8, range=(-1, 1), normalize=True)
     writer.add_image('original', fixed_grid, 0)
 

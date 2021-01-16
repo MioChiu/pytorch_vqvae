@@ -115,3 +115,29 @@ class MiniImagenet(data.Dataset):
 
     def __len__(self):
         return len(self._data)
+
+
+class DAGM2007(data.Dataset):
+    def __init__(self, root, split, transform=None):
+        super(DAGM2007, self).__init__()
+        self.root = root
+        self.split = split
+        self.transform = transform
+
+        self.img_list = os.listdir(os.path.join(self.root, self.split))
+
+        if not self._check_exists():
+            raise RuntimeError('Dataset not found.')
+
+    def __getitem__(self, index):
+        filename = self.img_list[index]
+        image = pil_loader(os.path.join(os.path.join(self.root, self.split), filename))
+        if self.transform is not None:
+            image = self.transform(image)
+        return image
+
+    def _check_exists(self):
+        return os.path.exists(self.root)
+
+    def __len__(self):
+        return len(self.img_list)
